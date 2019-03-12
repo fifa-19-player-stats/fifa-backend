@@ -127,7 +127,7 @@ server.get("/", (req, res) => {
 });
 
 server.get("/api", protected, (req, res) => {
-  db.select("name", "nationality", "club")
+  db.select("name", "id", "position")
     .from("players")
     .then(data => {
       res.status(200).json(data);
