@@ -17,23 +17,34 @@ server.use(helmet());
 server.set("port", process.env.PORT || 8000);
 
 /////////////////////////////////////////////////////////////////////
-// Load player data from json file
+// Load player data from json files
 /////////////////////////////////////////////////////////////////////
-// let data = JSON.parse(fs.readFileSync("PlayerInfo.json", "utf8"));
-// let errors = [];
-// for (let i = 0; i < data.data.length; i++) {
-//   delete data.data[i]["Unnamed: 0"];
+// let data1 = JSON.parse(fs.readFileSync("FIFA_Player_Info_V2.json", "utf8"));
+// let data2 = JSON.parse(fs.readFileSync("FIFA_Player_Stats_V2.json", "utf8"));
+// let data3 = JSON.parse(
+//   fs.readFileSync("FIFA_Player_Adv_Stats_V2.json", "utf8")
+// );
+
+// data1 = data1.data;
+// data2 = data2.data;
+// data3 = data3.data;
+
+// for (let i = 13000; i < data1.length; i++) {
+//   let newData = { ...data1[i], ...data2[i], ...data3[i] };
+//   delete newData["Unnamed: 0"];
 //   db("players")
-//     .insert(data.data[i])
+//     .insert(newData)
 //     .then(res => {})
 //     .catch(err => {
-//       //console.log(err);
+//       console.log(err);
 //     });
-//   if (i === data.data.length - 1) console.log("done");
+//   if (i === data1.length - 1) console.log("done");
 // }
 
+// Loads secret key fron .env file
 const secret = process.env.SECRET;
 
+// Create JWT upon login
 function generateToken(user) {
   const payload = {
     username: user.username,
@@ -48,13 +59,18 @@ function generateToken(user) {
   return jwt.sign(payload, secret, options);
 }
 
+// Protected middleware. Verifies JWT upon protected endpoint access
 function protected(req, res, next) {
   const token = req.headers.authorization;
 
   if (token) {
     jwt.verify(token, secret, (err, decodedToken) => {
       if (err) {
-        res.status(401).json({ message: "You shall not pass!" });
+        if (err.name == "TokenExpiredError") {
+          res.status(401).json({ message: "Token has expired", error: err });
+        } else {
+          res.status(401).json({ message: "Bad token", error: err });
+        }
       } else {
         req.user = { username: decodedToken.username };
 
@@ -66,64 +82,136 @@ function protected(req, res, next) {
   }
 }
 
-server.get("/api/users", protected, (req, res) => {
-  db("users")
-    .select("username", "id")
+// Basic call, verifies API is up and running
+server.get("/", (req, res) => {
+  res.status(200).json("API is running");
+});
+
+// Pulls player name, id, and position
+server.get("/api/players", protected, (req, res) => {
+  db("players")
+    .select("name", "id", "position")
     .then(data => {
       res.status(200).json(data);
     })
     .catch(err => {
+      res.status(500).json(err);
       console.error(err);
     });
 });
 
+// Get all stats on player with the id indicated in the url
+server.get("/api/players/:id", protected, (req, res) => {
+  db("players")
+    .where({ id: req.params.id })
+    .then(data => {
+      res.status(200).json(data);
+    })
+    .catch(err => {
+      res.status(500).json(err);
+      console.error(err);
+    });
+});
+
+// Get list of all players name, id, and position by team
+server.get("/api/team", protected, (req, res) => {
+  if (!req.body.team) {
+    res.status(404).json({ message: "Missing team name" });
+  } else {
+    db("players")
+      .where({ club: req.body.team })
+      .select("name", "id", "position")
+      .then(data => {
+        res.status(200).json(data);
+      })
+      .catch(err => {
+        console.log(err);
+        res.status(500).json(err);
+      });
+  }
+});
+
+// Get list of all players name, id, and position by team
+server.get("/api/nation", protected, (req, res) => {
+  if (!req.body.nation) {
+    res.status(404).json({ message: "Missing country name" });
+  } else {
+    db("players")
+      .where({ nationality: req.body.nation })
+      .select("name", "id", "position")
+      .then(data => {
+        res.status(200).json(data);
+      })
+      .catch(err => {
+        console.log(err);
+        res.status(500).json(err);
+      });
+  }
+});
+
+// Registers new user. Request body must contain a unique username and a
+// password. Returns a signed JWT
 server.post("/api/register", (req, res) => {
   let user = req.body;
   user.password = bcrypt.hashSync(user.password, 8);
-  console.log("called register");
+
   db("users")
-    .insert(user)
-    .then(ids => {
-      id = ids[0];
-      console.log("inserted");
-      db("users")
-        .where({ id: id })
-        .first()
-        .then(user => {
-          const token = generateToken(user);
-          res.status(201).json({ id: user.id, token });
-        })
-        .catch(err => {
-          console.log("inner", err);
-          res.status(500).json(err);
-        });
+    .where({ username: user.username })
+    .then(names => {
+      // If username doesn't exist insert new user and return a signed JWT
+      if (names.length === 0) {
+        db("users")
+          .insert(user)
+          .then(ids => {
+            const id = ids[0];
+
+            db("users")
+              .where({ id: id })
+              .first()
+              .then(user => {
+                const token = generateToken(user);
+                res
+                  .status(201)
+                  .json({ id: user.id, token, username: user.username });
+              })
+              .catch(err => {
+                res.status(500).json(err);
+              });
+          })
+          .catch(err => {
+            res.status(500).json(err);
+          });
+      } else {
+        res.status(400).json({ message: "The username has already been used" });
+      }
     })
     .catch(err => {
-      console.log("outer", err);
+      console.error(err);
       res.status(500).json(err);
     });
 });
 
+// Login user. Request body must contain username and password
 server.post("/api/login", (req, res) => {
   const creds = req.body;
 
-  db("users")
-    .where({ username: creds.username })
-    .first()
-    .then(user => {
-      if (user && bcrypt.compareSync(creds.password, user.password)) {
-        const token = generateToken(user);
+  if (!creds.username || !creds.password) {
+    res.status(400).json({ message: "Both username and password required" });
+  } else {
+    db("users")
+      .where({ username: creds.username })
+      .first()
+      .then(user => {
+        if (user && bcrypt.compareSync(creds.password, user.password)) {
+          const token = generateToken(user);
 
-        res.status(200).json({ token });
-      } else {
-        res.status(401).json({ message: "You shall not pass!" });
-      }
-    })
-    .catch(err => res.status(500).json(err));
-});
-
-server.get("/", (req, res) => {
-  res.status(200).json("API is running");
+          res.status(200).json({ token, username: user.username });
+        } else {
+          res.status(400).json({ message: "Incorrect username or password" });
+        }
+      })
+      .catch(err => res.status(500).json(err));
+  }
 });
 
 server.get("/api", protected, (req, res) => {
