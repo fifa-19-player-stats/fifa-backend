@@ -56,7 +56,8 @@ function generateToken(user) {
     jwtid: "12345"
   };
 
-  return jwt.sign(payload, secret, options);
+  if (secret) return jwt.sign(payload, secret, options);
+  return null;
 }
 
 // Protected middleware. Verifies JWT upon protected endpoint access
@@ -131,7 +132,7 @@ server.get("/api/team", protected, (req, res) => {
   }
 });
 
-// Get list of all players name, id, and position by team
+// Get list of all players name, id, and position by nationality
 server.get("/api/nation", protected, (req, res) => {
   if (!req.body.nation) {
     res.status(404).json({ message: "Missing country name" });
@@ -154,41 +155,46 @@ server.get("/api/nation", protected, (req, res) => {
 server.post("/api/register", (req, res) => {
   let user = req.body;
   user.password = bcrypt.hashSync(user.password, 8);
+  if (!secret) {
+    res.status(400).json({ message: "Missing secret key" });
+  } else {
+    db("users")
+      .where({ username: user.username })
+      .then(names => {
+        // If username doesn't exist insert new user and return a signed JWT
+        if (names.length === 0) {
+          db("users")
+            .insert(user)
+            .then(ids => {
+              const id = ids[0];
 
-  db("users")
-    .where({ username: user.username })
-    .then(names => {
-      // If username doesn't exist insert new user and return a signed JWT
-      if (names.length === 0) {
-        db("users")
-          .insert(user)
-          .then(ids => {
-            const id = ids[0];
-
-            db("users")
-              .where({ id: id })
-              .first()
-              .then(user => {
-                const token = generateToken(user);
-                res
-                  .status(201)
-                  .json({ id: user.id, token, username: user.username });
-              })
-              .catch(err => {
-                res.status(500).json(err);
-              });
-          })
-          .catch(err => {
-            res.status(500).json(err);
-          });
-      } else {
-        res.status(400).json({ message: "The username has already been used" });
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      res.status(500).json(err);
-    });
+              db("users")
+                .where({ id: id })
+                .first()
+                .then(user => {
+                  const token = generateToken(user);
+                  res
+                    .status(201)
+                    .json({ id: user.id, token, username: user.username });
+                })
+                .catch(err => {
+                  res.status(500).json(err);
+                });
+            })
+            .catch(err => {
+              res.status(500).json(err);
+            });
+        } else {
+          res
+            .status(400)
+            .json({ message: "The username has already been used" });
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        res.status(500).json(err);
+      });
+  }
 });
 
 // Login user. Request body must contain username and password
@@ -205,24 +211,14 @@ server.post("/api/login", (req, res) => {
         if (user && bcrypt.compareSync(creds.password, user.password)) {
           const token = generateToken(user);
 
-          res.status(200).json({ token, username: user.username });
+          if (token) res.status(200).json({ token, username: user.username });
+          else res.status(401).json({ message: "Unauthorized login attempt" });
         } else {
           res.status(400).json({ message: "Incorrect username or password" });
         }
       })
       .catch(err => res.status(500).json(err));
   }
-});
-
-server.get("/api", protected, (req, res) => {
-  db.select("name", "id", "position")
-    .from("players")
-    .then(data => {
-      res.status(200).json(data);
-    })
-    .catch(err => {
-      res.status(404).json(err);
-    });
 });
 
 server.listen(server.get("port"), () => {
