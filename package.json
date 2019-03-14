@@ -4,7 +4,7 @@
   "description": "Backend for the fifa2 build week project",
   "main": "index.js",
   "scripts": {
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "start": "nodemon"
   },
   "keywords": [],
