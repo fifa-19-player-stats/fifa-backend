@@ -268,6 +268,33 @@ server.put("/api/passchange", protected, (req, res) => {
   }
 });
 
+server.delete("/api/userdel", protected, (req, res) => {
+  const creds = req.body;
+
+  if (!creds.username || !creds.password) {
+    res.status(400).json({ message: "Both username and password required" });
+  } else {
+    db("users")
+      .where({ username: creds.username })
+      .first()
+      .then(user => {
+        if (user && bcrypt.compareSync(creds.password, user.password)) {
+          db("users")
+            .where({ username: creds.username })
+            .del()
+            .then(deleted => {
+              if (deleted > 0)
+                res.status(200).json({ message: "User deleted" });
+              else res.status(404).json({ message: "User not found" });
+            });
+        } else {
+          res.status(400).json({ message: "Incorrect username or password" });
+        }
+      })
+      .catch(err => res.status(500).json(err));
+  }
+});
+
 server.listen(server.get("port"), () => {
   console.log("== LISTENING ON PORT", server.get("port"), "==");
 });
