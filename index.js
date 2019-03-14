@@ -229,6 +229,72 @@ server.post("/api/login", (req, res) => {
   }
 });
 
+server.put("/api/passchange", protected, (req, res) => {
+  let creds = req.body;
+
+  if (!creds.username || !creds.oldPassword || !creds.newPassword) {
+    res
+      .status(400)
+      .json({ message: "Both username and old and new password required" });
+  } else if (creds.newPassword.length < 8) {
+    res
+      .status(400)
+      .json({ message: "New password must be at least 8 characters long" });
+  } else {
+    db("users")
+      .where({ username: creds.username })
+      .first()
+      .then(user => {
+        if (user && bcrypt.compareSync(creds.oldPassword, user.password)) {
+          let newPass = bcrypt.hashSync(creds.newPassword, 8);
+          db("users")
+            .where({ username: user.username })
+            .update({ password: newPass })
+            .then(() => {
+              res.status(200).json({ message: "Password updated" });
+            })
+            .catch(err => {
+              console.log("inner", err);
+              res.status(500).json(err);
+            });
+        } else {
+          res.status(400).json({ message: "Incorrect username or password" });
+        }
+      })
+      .catch(err => {
+        console.log("outer", err);
+        res.status(500).json(err);
+      });
+  }
+});
+
+server.delete("/api/userdel", protected, (req, res) => {
+  const creds = req.body;
+
+  if (!creds.username || !creds.password) {
+    res.status(400).json({ message: "Both username and password required" });
+  } else {
+    db("users")
+      .where({ username: creds.username })
+      .first()
+      .then(user => {
+        if (user && bcrypt.compareSync(creds.password, user.password)) {
+          db("users")
+            .where({ username: creds.username })
+            .del()
+            .then(deleted => {
+              if (deleted > 0)
+                res.status(200).json({ message: "User deleted" });
+              else res.status(404).json({ message: "User not found" });
+            });
+        } else {
+          res.status(400).json({ message: "Incorrect username or password" });
+        }
+      })
+      .catch(err => res.status(500).json(err));
+  }
+});
+
 server.listen(server.get("port"), () => {
   console.log("== LISTENING ON PORT", server.get("port"), "==");
 });
