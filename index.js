@@ -155,6 +155,9 @@ server.get("/api/nation", protected, (req, res) => {
 server.post("/api/register", (req, res) => {
   let user = req.body;
   user.password = bcrypt.hashSync(user.password, 8);
+
+  // Check for secret key, valid username, and valid password before
+  // inserting new user
   if (!secret) {
     res.status(400).json({ message: "Missing secret key" });
   } else if (user.username.length < 3 || !user.username) {
@@ -229,6 +232,8 @@ server.post("/api/login", (req, res) => {
   }
 });
 
+// Change password. Request body must contain username, old password,
+// and new password. New password must be at least 8 characters
 server.put("/api/passchange", protected, (req, res) => {
   let creds = req.body;
 
@@ -268,6 +273,7 @@ server.put("/api/passchange", protected, (req, res) => {
   }
 });
 
+// Delete user. Request body must contain username and password
 server.delete("/api/userdel", protected, (req, res) => {
   const creds = req.body;
 
