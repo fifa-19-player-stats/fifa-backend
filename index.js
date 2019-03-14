@@ -157,6 +157,14 @@ server.post("/api/register", (req, res) => {
   user.password = bcrypt.hashSync(user.password, 8);
   if (!secret) {
     res.status(400).json({ message: "Missing secret key" });
+  } else if (user.username.length < 3 || !user.username) {
+    res
+      .status(400)
+      .json({ message: "Username must be at least 3 characters long" });
+  } else if (user.password.length < 8 || !user.username) {
+    res
+      .status(400)
+      .json({ message: "Password must be at least 8 characters long" });
   } else {
     db("users")
       .where({ username: user.username })
