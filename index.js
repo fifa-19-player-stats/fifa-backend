@@ -19,26 +19,24 @@ server.set("port", process.env.PORT || 8000);
 /////////////////////////////////////////////////////////////////////
 // Load player data from json files
 /////////////////////////////////////////////////////////////////////
-// let data1 = JSON.parse(fs.readFileSync("FIFA_Player_Info_V2.json", "utf8"));
-// let data2 = JSON.parse(fs.readFileSync("FIFA_Player_Stats_V2.json", "utf8"));
-// let data3 = JSON.parse(
-//   fs.readFileSync("FIFA_Player_Adv_Stats_V2.json", "utf8")
-// );
+// let data = JSON.parse(fs.readFileSync(`./data/Best_Striker.json`, "utf8"));
 
-// data1 = data1.data;
-// data2 = data2.data;
-// data3 = data3.data;
+// let scores = data.Score;
+// let rank = data.Rank;
 
-// for (let i = 13000; i < data1.length; i++) {
-//   let newData = { ...data1[i], ...data2[i], ...data3[i] };
-//   delete newData["Unnamed: 0"];
-//   db("players")
+// let ids = Object.keys(scores);
+// for (let i = 0; i < ids.length; i++) {
+//   let id = ids[i];
+//   let newData = { id: id, score: scores[id], rank: rank[id] };
+
+//   db("ST")
 //     .insert(newData)
-//     .then(res => {})
+//     .then(res => {
+//       if (i === ids.length - 1) console.log("done");
+//     })
 //     .catch(err => {
 //       console.log(err);
 //     });
-//   if (i === data1.length - 1) console.log("done");
 // }
 
 // Loads secret key fron .env file
@@ -148,6 +146,32 @@ server.get("/api/nation", protected, (req, res) => {
         res.status(500).json(err);
       });
   }
+});
+
+// Get list of player score and rank by position
+server.get("/api/ranking", protected, (req, res) => {
+  let position = req.body.position.toUpperCase();
+
+  db.select(
+    `${position}.id`,
+    `${position}.score`,
+    `${position}.rank`,
+    "players.name"
+  )
+    .from(position)
+    .innerJoin("players", `${position}.id`, "players.id")
+    .then(data => {
+      data.sort((a, b) => {
+        if (a.rank < b.rank) return -1;
+        if (a.rank > b.rank) return 1;
+        return 0;
+      });
+      res.status(200).json(data);
+    })
+    .catch(err => {
+      console.log(err);
+      res.status(500).json(err);
+    });
 });
 
 // Registers new user. Request body must contain a unique username and a
