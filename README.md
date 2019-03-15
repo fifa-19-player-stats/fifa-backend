@@ -9,6 +9,7 @@
   - [Players by team](#players-by-team)
   - [Players by nationality](#players-by-nationality)
   - [Rankings](#rankings)
+  - [Similarity](#similarity)
   - [Login](#login)
   - [Register](#register)
   - [Change user password](#change-password)
@@ -57,6 +58,11 @@
 
 - Send `GET` request to `/api/ranking` with `position` abbreviation in the request body. Position is not case sensitive.
 - Response will contain an array of objects containing `id`, `score`, `rank`, and `name`. Response is sorted by rank.
+
+### Similarity
+
+- Send `GET` request to `/api/similar/:id`
+- Response will contain `index`, `id`, `name`, `club`, `position`, and the 5 most similar players ranked most similar to least similar - `similar1`, `similar2`, `similar3`, `similar4`, and `similar5`.
 
 ### Login
 
