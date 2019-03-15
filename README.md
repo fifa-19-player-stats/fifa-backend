@@ -8,6 +8,7 @@
   - [Single player](#single-player)
   - [Players by team](#players-by-team)
   - [Players by nationality](#players-by-nationality)
+  - [Rankings](#rankings)
   - [Login](#login)
   - [Register](#register)
   - [Change user password](#change-password)
@@ -51,6 +52,11 @@
   - `id` - Unique identifier for each player.
   - `name` - Player's name.
   - `position` - Player's position.
+
+### Rankings
+
+- Send `GET` request to `/api/ranking` with `position` abbreviation in the request body. Position is not case sensitive.
+- Response will contain an array of objects containing `id`, `score`, `rank`, and `name`. Response is sorted by rank.
 
 ### Login
 
